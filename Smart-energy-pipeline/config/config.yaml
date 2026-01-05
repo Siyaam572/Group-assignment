@@ -1,0 +1,46 @@
+# Smart Energy Grid Pipeline Configuration
+
+# Data paths
+data:
+  demand_path: "data/demand.csv"
+  plants_path: "data/plants.csv"
+  costs_path: "data/generation_costs.csv"
+
+# Model selection
+model:
+  type: "GradientBoosting"
+  
+  gradient_boosting:
+    n_estimators: 150
+    learning_rate: 0.2
+    max_depth: 3
+    random_state: 42
+  
+  random_forest:
+    n_estimators: 50
+    max_depth: 3
+    min_samples_split: 2
+    random_state: 42
+
+# Cross-validation settings
+cross_validation:
+  method: "LeaveOneGroupOut"
+  n_jobs: -1
+
+# Hyperparameter tuning settings
+tuning:
+  enabled: false
+  cv_folds: 20
+
+# Output settings
+output:
+  save_model: true
+  save_predictions: true
+  save_metrics: true
+  models_dir: "outputs/models"
+  results_dir: "outputs/results"
+  figures_dir: "outputs/figures"
+
+# Logging
+logging:
+  level: "INFO"
