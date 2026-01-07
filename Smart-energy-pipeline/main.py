@@ -61,7 +61,7 @@ def main():
     # Evaluate using LOGO CV
     print("\n[5/6] Evaluating model...")
     results = evaluate_model(model, X, y, groups, config, df_full=df_full, plant_ids=plant_ids)
-    logging.info(f"Cross-validation RMSE: {results['cv_rmse']:.4f}")
+    logging.info(f"Cross-validation RMSE: {results['cv_selection_rmse_mean']:.4f}")
     
     # Run hyperparameter tuning if enabled
     if config['tuning']['enabled']:
@@ -83,4 +83,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
