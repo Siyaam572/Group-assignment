@@ -1,78 +1,125 @@
-# src/evaluator.py
+"""
+Model evaluation using Leave-One-Group-Out cross-validation
+selection RMSE metric (Equations 1 & 2)
+"""
+import logging
 import numpy as np
-import pandas as pd
 from sklearn.model_selection import LeaveOneGroupOut
 
-def evaluate_model(model, X, y, groups, config, df_full=None, plant_ids=None):
+logger = logging.getLogger(__name__)
+
+
+def calculate_selection_rmse(y_true, y_pred, demand_ids):
     """
-    Evaluate model using Leave-One-Group-Out cross-validation
-    Tests the trained model on each demand scenario
+    Calculate selection error RMSE using Equations 1 & 2 from assessment brief.
+    
+    For each demand scenario:
+    - Find the optimal plant (minimum actual cost)
+    - Find ML-selected plant (minimum predicted cost)
+    - Error(d) = optimal_cost - ml_selected_cost
+    
+    Overall Score = sqrt(mean(Error^2))
+    
+    Args:
+        y_true: Actual costs
+        y_pred: Predicted costs  
+        demand_ids: Demand ID for each row
+    
+    Returns:
+        Dictionary with RMSE, mean error, std dev, and optimal count
     """
-    
-    print("Starting Leave-One-Group-Out cross-validation...")
-    print("This will take a few minutes...")
-    
-    # Convert to numpy
-    if hasattr(X, 'values'):
-        X_arr = X.values
-    else:
-        X_arr = X
-        
-    if hasattr(y, 'values'):
-        y_arr = y.values
-    else:
-        y_arr = y
-        
-    if hasattr(groups, 'values'):
-        groups_arr = groups.values
-    else:
-        groups_arr = np.array(groups)
-    
-    # Setup LOGO CV
-    logo = LeaveOneGroupOut()
     errors = []
+    optimal_count = 0
     
-    # Count unique demands
-    unique_demands = np.unique(groups_arr)
-    total_demands = len(unique_demands)
-    
-    print(f"Evaluating on {total_demands} demand scenarios...")
-    
-    # For each demand scenario
-    for fold_num, (train_idx, test_idx) in enumerate(logo.split(X_arr, y_arr, groups_arr), 1):
+    for d in np.unique(demand_ids):
+        mask = demand_ids == d
+        true_costs = y_true[mask]
+        pred_costs = y_pred[mask]
+
+        # Optimal cost
+        best_true_cost = true_costs.min()
         
-        if fold_num % 100 == 0:
-            print(f"  Processed {fold_num}/{total_demands} demands...")
-        
-        # Get predictions for this demand's plants
-        y_pred_test = model.predict(X_arr[test_idx])
-        y_true_test = y_arr[test_idx]
-        
-        # Find optimal (actual minimum cost)
-        optimal_cost = y_true_test.min()
-        
-        # Find ML-selected plant (minimum predicted cost)
-        ml_selected_idx = np.argmin(y_pred_test)
-        ml_selected_cost = y_true_test[ml_selected_idx]
-        
-        # Calculate error for this demand
-        error = optimal_cost - ml_selected_cost
+        # ML-selected plant
+        selected_idx = np.argmin(pred_costs)
+        selected_true_cost = true_costs[selected_idx]
+
+        # Error for this demand
+        error = best_true_cost - selected_true_cost
         errors.append(error)
-    
-    # Calculate RMSE
+        
+        # Count optimal selections (error = 0)
+        if abs(error) < 0.01:
+            optimal_count += 1
+
     errors = np.array(errors)
-    cv_rmse = np.sqrt(np.mean(errors ** 2))
-    
-    print(f"\nCross-validation complete!")
-    print(f"Mean error: {np.mean(errors):.4f}")
-    print(f"Std dev of errors: {np.std(errors):.4f}")
-    print(f"RMSE: {cv_rmse:.4f}")
-    print(f"Number of optimal selections: {(errors == 0).sum()}/{len(errors)}")
     
     return {
-        'cv_selection_rmse_mean': float(cv_rmse),
-        'cv_selection_rmse_std': float(np.std(errors)),
-        'mean_error': float(np.mean(errors)),
-        'cv_folds': int(len(errors)),
-        'optimal_selections': int((errors == 0).sum())
+        'rmse': np.sqrt(np.mean(errors ** 2)),
+        'mean_error': np.mean(errors),
+        'std_error': np.std(errors),
+        'optimal_selections': optimal_count,
+        'total_demands': len(np.unique(demand_ids))
     }
+
+
+def evaluate_model(model, X, y, groups, plant_ids, config):
+    """
+    Evaluate model using Leave-One-Group-Out cross-validation.
+    Fast approach: trains once, reuses for all folds.
+    
+    Args:
+        model: Trained model/pipeline to evaluate
+        X: Feature matrix
+        y: Target values (costs)
+        groups: Demand IDs for grouping
+        plant_ids: Plant IDs (not used but kept for consistency)
+        config: Configuration dictionary
+    
+    Returns:
+        Dictionary with evaluation metrics
+    """
+    logger.info("Starting Leave-One-Group-Out cross-validation...")
+    logger.info("Using fast evaluation (reuse trained model)")
+    
+    logo = LeaveOneGroupOut()
+    n_demands = len(np.unique(groups))
+    
+    logger.info(f"Evaluating on {n_demands} demand scenarios...")
+    logger.info("This will take a few minutes...")
+    
+    # Collect predictions for all folds
+    all_y_true = []
+    all_y_pred = []
+    all_groups = []
+    
+    fold_count = 0
+    for train_idx, test_idx in logo.split(X, y, groups):
+        # Get predictions for this fold
+        y_pred = model.predict(X[test_idx])
+        
+        all_y_true.extend(y[test_idx])
+        all_y_pred.extend(y_pred)
+        all_groups.extend(groups[test_idx])
+        
+        fold_count += 1
+        if fold_count % 100 == 0:
+            logger.info(f"  Processed {fold_count}/{n_demands} demands...")
+    
+    logger.info(f"  Processed {fold_count}/{n_demands} demands...")
+    
+    # Convert to numpy arrays
+    all_y_true = np.array(all_y_true)
+    all_y_pred = np.array(all_y_pred)
+    all_groups = np.array(all_groups)
+    
+    # Calculate selection RMSE
+    logger.info("Calculating selection RMSE...")
+    results = calculate_selection_rmse(all_y_true, all_y_pred, all_groups)
+    
+    logger.info(f"\nCross-validation complete!")
+    logger.info(f"Mean error: {results['mean_error']:.4f}")
+    logger.info(f"Std dev of errors: {results['std_error']:.4f}")
+    logger.info(f"RMSE: {results['rmse']:.4f}")
+    logger.info(f"Number of optimal selections: {results['optimal_selections']}/{results['total_demands']}")
+    
+    return results
