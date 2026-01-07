@@ -2,9 +2,9 @@
 
 # Data paths
 data:
-  demand_path: "data/demand.csv"
-  plants_path: "data/plants.csv"
-  costs_path: "data/generation_costs.csv"
+  demand_path: "Data/demand.csv"
+  plants_path: "Data/plants.csv"
+  costs_path: "Data/generation_costs.csv"
 
 # Model selection
 model:
@@ -43,4 +43,5 @@ output:
 
 # Logging
 logging:
+
   level: "INFO"
