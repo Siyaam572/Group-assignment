@@ -29,7 +29,7 @@ cross_validation:
 
 # Hyperparameter tuning settings
 tuning:
-  enabled: false
+  enabled: true
   cv_folds: 20
 
 # Output settings
@@ -45,3 +45,4 @@ output:
 logging:
 
   level: "INFO"
+
