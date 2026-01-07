@@ -1,100 +1,98 @@
-# src/preprocessing.py
+"""
+Data preprocessing module - handles data loading, cleaning, and feature preparation
+Returns numpy arrays for model training
+"""
 import pandas as pd
+import numpy as np
 
-def preprocess_data(data, config):
+
+def preprocess_data(demand, plants, costs, config):
     """
-    Clean and prepare data for modeling
+    Preprocess and merge datasets for model training.
     
-    Performs data cleaning including handling missing values, 
-    fixing data quality issues, removing non-competitive plants,
-    and one-hot encoding categorical variables.
+    Steps:
+    1. Handle missing values
+    2. Fix data quality issues
+    3. Filter non-competitive plants
+    4. Merge datasets
+    5. One-hot encode categorical variables
+    6. Convert to numpy arrays
+    
+    Args:
+        demand: Demand scenarios DataFrame
+        plants: Power plants DataFrame
+        costs: Generation costs DataFrame
+        config: Configuration dictionary
     
     Returns:
-        X: Features (one-hot encoded, numeric)
-        y: Target variable (Cost_USD_per_MWh)
-        groups: Demand IDs for cross-validation
-        plant_ids: Plant IDs for evaluation
+        X: Feature matrix (numpy array)
+        y: Target values (numpy array)
+        groups: Demand IDs (numpy array)
+        plant_ids: Plant IDs (numpy array)
     """
+    print("\nStarting data preprocessing...")
     
-    # Get the raw dataframes
-    demand = data['demand_df'].copy()
-    plants = data['plants_df'].copy()
-    costs = data['costs_df'].copy()
-    
-    print("Starting data preprocessing...")
-    
-    # Handle missing values in NUMERIC demand features only
+    # Handle missing values
     print("Handling missing values...")
-    df_cols = [c for c in demand.columns if c.startswith('DF')]
-    
-    # Only fill numeric columns (skip text columns like DF_region, DF_daytype)
-    numeric_df_cols = demand[df_cols].select_dtypes(include=['number']).columns
-    missing_count = demand[numeric_df_cols].isnull().sum().sum()
-    
-    for col in numeric_df_cols:
-        if demand[col].isnull().any():
+    demand_missing = 0
+    for col in demand.columns:
+        if demand[col].dtype in ['float64', 'int64'] and demand[col].isnull().any():
             demand[col].fillna(demand[col].median(), inplace=True)
+            demand_missing += demand[col].isnull().sum()
+    print(f"Filled {demand_missing} missing values in demand features")
     
-    if missing_count > 0:
-        print(f"Filled {missing_count} missing values in demand features")
-    
-    # Handle missing values in costs
     cost_missing = costs['Cost_USD_per_MWh'].isnull().sum()
-    if cost_missing > 0:
-        costs['Cost_USD_per_MWh'].fillna(costs['Cost_USD_per_MWh'].median(), inplace=True)
-        print(f"Filled {cost_missing} missing values in costs")
+    costs['Cost_USD_per_MWh'].fillna(costs['Cost_USD_per_MWh'].median(), inplace=True)
+    print(f"Filled {cost_missing} missing values in costs")
     
-    # Fix "NA" string to "NORAM" 
+    # Fix data quality issues
     print("Fixing data quality issues...")
-    if 'DF_region' in demand.columns:
-        na_count = (demand['DF_region'] == 'NA').sum()
-        if na_count > 0:
-            demand['DF_region'] = demand['DF_region'].replace('NA', 'NORAM')
-            print(f"Fixed {na_count} 'NA' values in demand regions")
+    demand['DF_region'] = demand['DF_region'].replace('NA', 'NORAM')
+    plants['Region'] = plants['Region'].replace('NA', 'NORAM')
     
-    if 'Region' in plants.columns:
-        na_count = (plants['Region'] == 'NA').sum()
-        if na_count > 0:
-            plants['Region'] = plants['Region'].replace('NA', 'NORAM')
-            print(f"Fixed {na_count} 'NA' values in plant regions")
-    
-    # Remove non-competitive plants
-    # These plants never appeared in top 10 for any demand scenario
+    # Filter non-competitive plants
     print("Filtering non-competitive plants...")
-    non_competitive = ['P2', 'P4', 'P5', 'P6', 'P9', 'P13', 
-                       'P39', 'P46', 'P47', 'P52', 'P58', 'P59']
+    top_plants_per_demand = costs.sort_values(['Demand ID', 'Cost_USD_per_MWh']).groupby('Demand ID').head(10)
+    competitive_plants = top_plants_per_demand['Plant ID'].unique()
     
-    plants_before = len(plants)
-    plants = plants[~plants['Plant ID'].isin(non_competitive)]
-    costs = costs[~costs['Plant ID'].isin(non_competitive)]
-    print(f"Removed {plants_before - len(plants)} plants, {len(plants)} remaining")
+    original_plant_count = plants['Plant ID'].nunique()
+    plants = plants[plants['Plant ID'].isin(competitive_plants)]
+    costs = costs[costs['Plant ID'].isin(competitive_plants)]
+    remaining_plants = plants['Plant ID'].nunique()
     
-    # Merge the datasets
+    print(f"Removed {original_plant_count - remaining_plants} plants, {remaining_plants} remaining")
+    
+    # Merge datasets
     print("Merging datasets...")
-    merged = pd.merge(costs, demand, on='Demand ID', how='inner')
-    merged = pd.merge(merged, plants, on='Plant ID', how='inner')
-    print(f"Merged dataset shape: {merged.shape}")
+    df = costs.merge(demand, on='Demand ID', how='inner')
+    df = df.merge(plants, on='Plant ID', how='inner')
+    print(f"Merged dataset shape: {df.shape}")
     
-    # Extract variables before dropping columns
-    groups = merged['Demand ID'].copy()
-    plant_ids = merged['Plant ID'].copy()
-    y = merged['Cost_USD_per_MWh'].copy()
-    
-    # Create feature matrix
-    X = merged.drop(columns=['Cost_USD_per_MWh', 'Demand ID', 'Plant ID'])
+    # Separate features and target
+    feature_cols = [c for c in df.columns if c.startswith('DF') or c.startswith('PF')]
+    categorical_cols = ['DF_region', 'DF_daytype', 'Plant Type', 'Region']
     
     # One-hot encode categorical variables
-    categorical_cols = X.select_dtypes(include=['object']).columns
-    if len(categorical_cols) > 0:
-        print(f"One-hot encoding {len(categorical_cols)} categorical columns")
-        X = pd.get_dummies(X, columns=categorical_cols, drop_first=True)
+    print(f"One-hot encoding {len(categorical_cols)} categorical columns")
+    df_encoded = pd.get_dummies(df, columns=categorical_cols, drop_first=True)
     
-    # Convert to numeric
-    X = X.astype(float)
-    y = y.astype(float)
+    # Get final feature columns (original + one-hot encoded)
+    encoded_feature_cols = [c for c in df_encoded.columns if c.startswith('DF') or c.startswith('PF')]
+    
+    # Extract arrays
+    X_df = df_encoded[encoded_feature_cols]
+    y_series = df_encoded['Cost_USD_per_MWh']
+    groups_series = df_encoded['Demand ID']
+    plant_ids_series = df_encoded['Plant ID']
+    
+    # Convert to numpy arrays (CRITICAL FIX!)
+    X = X_df.values
+    y = y_series.values
+    groups = groups_series.values
+    plant_ids = plant_ids_series.values
     
     print("\nPreprocessing complete")
     print(f"Features: {X.shape[0]} rows x {X.shape[1]} columns")
-    print(f"Unique demands: {len(groups.unique())}, Unique plants: {len(plant_ids.unique())}")
+    print(f"Unique demands: {len(np.unique(groups))}, Unique plants: {len(np.unique(plant_ids))}")
     
-    return X, y, groups, plant_ids, merged
+    return X, y, groups, plant_ids
