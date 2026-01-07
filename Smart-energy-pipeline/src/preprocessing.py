@@ -1,27 +1,16 @@
 """
-Data preprocessing module - handles data loading, cleaning, and feature preparation
-Returns numpy arrays for model training
+Data preprocessing module
 """
 import pandas as pd
 import numpy as np
 
 
-def preprocess_data(demand, plants, costs, config):
+def preprocess_data(data, config):
     """
-    Preprocess and merge datasets for model training.
-    
-    Steps:
-    1. Handle missing values
-    2. Fix data quality issues
-    3. Filter non-competitive plants
-    4. Merge datasets
-    5. One-hot encode categorical variables
-    6. Convert to numpy arrays
+    Preprocess merged data for model training.
     
     Args:
-        demand: Demand scenarios DataFrame
-        plants: Power plants DataFrame
-        costs: Generation costs DataFrame
+        data: Dictionary with 'demand', 'plants', 'costs' DataFrames
         config: Configuration dictionary
     
     Returns:
@@ -29,20 +18,28 @@ def preprocess_data(demand, plants, costs, config):
         y: Target values (numpy array)
         groups: Demand IDs (numpy array)
         plant_ids: Plant IDs (numpy array)
+        df_full: Full merged DataFrame
     """
     print("\nStarting data preprocessing...")
+    
+    # Extract dataframes from data dict
+    demand = data['demand'].copy()
+    plants = data['plants'].copy()
+    costs = data['costs'].copy()
     
     # Handle missing values
     print("Handling missing values...")
     demand_missing = 0
     for col in demand.columns:
         if demand[col].dtype in ['float64', 'int64'] and demand[col].isnull().any():
-            demand[col].fillna(demand[col].median(), inplace=True)
+            median_val = demand[col].median()
+            demand[col] = demand[col].fillna(median_val)
             demand_missing += demand[col].isnull().sum()
     print(f"Filled {demand_missing} missing values in demand features")
     
     cost_missing = costs['Cost_USD_per_MWh'].isnull().sum()
-    costs['Cost_USD_per_MWh'].fillna(costs['Cost_USD_per_MWh'].median(), inplace=True)
+    median_cost = costs['Cost_USD_per_MWh'].median()
+    costs['Cost_USD_per_MWh'] = costs['Cost_USD_per_MWh'].fillna(median_cost)
     print(f"Filled {cost_missing} missing values in costs")
     
     # Fix data quality issues
@@ -76,23 +73,17 @@ def preprocess_data(demand, plants, costs, config):
     print(f"One-hot encoding {len(categorical_cols)} categorical columns")
     df_encoded = pd.get_dummies(df, columns=categorical_cols, drop_first=True)
     
-    # Get final feature columns (original + one-hot encoded)
+    # Get final feature columns
     encoded_feature_cols = [c for c in df_encoded.columns if c.startswith('DF') or c.startswith('PF')]
     
-    # Extract arrays
-    X_df = df_encoded[encoded_feature_cols]
-    y_series = df_encoded['Cost_USD_per_MWh']
-    groups_series = df_encoded['Demand ID']
-    plant_ids_series = df_encoded['Plant ID']
-    
-    # Convert to numpy arrays (CRITICAL FIX!)
-    X = X_df.values
-    y = y_series.values
-    groups = groups_series.values
-    plant_ids = plant_ids_series.values
+    # Extract data
+    X = df_encoded[encoded_feature_cols].values
+    y = df_encoded['Cost_USD_per_MWh'].values
+    groups = df_encoded['Demand ID'].values
+    plant_ids = df_encoded['Plant ID'].values
     
     print("\nPreprocessing complete")
     print(f"Features: {X.shape[0]} rows x {X.shape[1]} columns")
     print(f"Unique demands: {len(np.unique(groups))}, Unique plants: {len(np.unique(plant_ids))}")
     
-    return X, y, groups, plant_ids
+    return X, y, groups, plant_ids, df_encoded
