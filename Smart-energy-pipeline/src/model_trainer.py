@@ -1,57 +1,62 @@
-# src/model_trainer.py
+"""
+Pipeline: StandardScaler -> VarianceThreshold -> Regressor
+"""
+import logging
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.feature_selection import VarianceThreshold
+from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
 
-# src/model_trainer.py
+logger = logging.getLogger(__name__)
 
-import pandas as pd
-from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
 
-def train_model(X, y, groups, plant_ids, config):
+def train_model(X, y, plant_ids, config):
     """
-    Train the selected model from config.yaml.
-
-    Inputs:
-      X: DataFrame of features
-      y: Series of target (Cost_USD_per_MWh)
-      groups: Series of Demand IDs (not used here, but kept for pipeline consistency)
-      config: dict from config.yaml
-
+    
+    
+    Pipeline steps:
+    1. StandardScaler - standardize features
+    2. VarianceThreshold - remove low-variance features
+    3. Regressor - RandomForest or GradientBoosting
+    
+    Args:
+        X: Feature matrix
+        y: Target values (costs)
+        plant_ids: Plant IDs (not used but kept for consistency)
+        config: Configuration dictionary
+    
     Returns:
-      model: fitted sklearn model
-      pipeline: same as model (placeholder for future sklearn Pipeline use)
+        pipeline: Trained sklearn Pipeline object
     """
-
-    model_type = config["model"]["type"]
-
-    if model_type == "GradientBoosting":
-        params = config["model"]["gradient_boosting"]
-
-        # NOTE: GradientBoostingRegressor uses max_depth inside its base estimator via "max_depth"
-        # via parameter "max_depth" in sklearn works in newer versions through "max_depth" in params
-        model = GradientBoostingRegressor(
-            n_estimators=params["n_estimators"],
-            learning_rate=params["learning_rate"],
-            max_depth=params["max_depth"],
-            random_state=params["random_state"],
-        )
-
-    elif model_type == "RandomForest":
-        params = config["model"]["random_forest"]
-        model = RandomForestRegressor(
-            n_estimators=params["n_estimators"],
-            max_depth=params["max_depth"],
-            min_samples_split=params["min_samples_split"],
-            random_state=params["random_state"],
+    logger.info("Training model...")
+    
+    model_type = config['model']['type']
+    
+    # Select regressor based on config
+    if model_type == 'GradientBoosting':
+        regressor = GradientBoostingRegressor(random_state=42)
+        logger.info("Using GradientBoostingRegressor")
+    elif model_type == 'RandomForest':
+        regressor = RandomForestRegressor(
+            n_estimators=100,
+            max_depth=20,
+            random_state=42,
             n_jobs=-1
         )
-
+        logger.info("Using RandomForestRegressor")
     else:
-        raise ValueError(f"Unsupported model type in config: {model_type}")
-
-    # Fit
-    model.fit(X, y)
-
-    # For now pipeline == model (later you can replace with a sklearn Pipeline)
-    pipeline = model
-
-    return model, pipeline
-
+        raise ValueError(f"Unknown model type: {model_type}")
+    
+    pipeline = Pipeline(steps=[
+        ("scaler", StandardScaler()),
+        ("variance", VarianceThreshold(threshold=0.01)),
+        ("regressor", regressor)
+    ])
+    
+    # Train pipeline
+    logger.info("Fitting pipeline on full dataset...")
+    pipeline.fit(X, y)
+    
+    logger.info(f"Model training complete: {model_type}")
+    
+    return pipeline
