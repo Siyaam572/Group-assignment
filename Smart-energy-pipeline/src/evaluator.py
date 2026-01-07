@@ -69,9 +69,9 @@ def evaluate_model(model, X, y, groups, config, df_full=None, plant_ids=None):
     
     Args:
         model: Trained model/pipeline to evaluate
-        X: Feature matrix
-        y: Target values (costs)
-        groups: Demand IDs for grouping
+        X: Feature matrix (numpy array)
+        y: Target values (numpy array)
+        groups: Demand IDs (numpy array)
         config: Configuration dictionary
         df_full: Full dataframe (optional, not used)
         plant_ids: Plant IDs (optional, not used)
@@ -96,6 +96,7 @@ def evaluate_model(model, X, y, groups, config, df_full=None, plant_ids=None):
     fold_count = 0
     for train_idx, test_idx in logo.split(X, y, groups):
         # Get predictions for this fold
+        # X is a numpy array, so we can use regular indexing
         y_pred = model.predict(X[test_idx])
         
         all_y_true.extend(y[test_idx])
