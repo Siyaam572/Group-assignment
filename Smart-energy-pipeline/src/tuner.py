@@ -1,6 +1,5 @@
 """
 Hyperparameter tuning using GridSearchCV with Leave-One-Group-Out CV
-
 """
 import logging
 import numpy as np
@@ -82,7 +81,7 @@ def make_logo_scorer(groups_all, X_all):
 def tune_hyperparameters(X, y, groups, plant_ids, config):
     """
     Perform hyperparameter tuning using GridSearchCV with LOGO CV.
-    Uses Role 3's implementation with 80-demand subsampling for efficiency.
+    Uses 80-demand subsampling for computational efficiency.
     
     Args:
         X: Feature matrix (numpy array)
@@ -95,11 +94,11 @@ def tune_hyperparameters(X, y, groups, plant_ids, config):
         best_pipeline: Tuned model pipeline (trained on full data)
         results: Dictionary with best params, RMSE, and metadata
     """
-    logger.info("Starting hyperparameter tuning ...")
+    logger.info("Starting hyperparameter tuning...")
     
     model_type = config['model']['type']
     
-    
+    # Subsample demands for computational efficiency
     MAX_LOGO_DEMANDS = 80
     unique_demands = np.unique(groups)
     
@@ -122,7 +121,7 @@ def tune_hyperparameters(X, y, groups, plant_ids, config):
     
     logger.info(f"Tuning on {len(np.unique(groups_sample))} demands, {len(X_sample)} total rows")
     
-    # Set up model and parameter grid 
+    # Set up model and parameter grid
     if model_type == 'GradientBoosting':
         regressor = GradientBoostingRegressor(random_state=42)
         param_grid = {
@@ -140,7 +139,7 @@ def tune_hyperparameters(X, y, groups, plant_ids, config):
         }
         logger.info("Tuning RandomForest: 8 parameter combinations")
     
-    # Create pipeline 
+    # Create pipeline
     pipeline = Pipeline(steps=[
         ("scaler", StandardScaler()),
         ("variance", VarianceThreshold(threshold=0.01)),
