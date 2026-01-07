@@ -23,12 +23,15 @@ def preprocess_data(data, config):
     
     print("Starting data preprocessing...")
     
-    # Handle missing values in demand features
+    # Handle missing values in NUMERIC demand features only
     print("Handling missing values...")
     df_cols = [c for c in demand.columns if c.startswith('DF')]
-    missing_count = demand[df_cols].isnull().sum().sum()
     
-    for col in df_cols:
+    # Only fill numeric columns (skip text columns like DF_region, DF_daytype)
+    numeric_df_cols = demand[df_cols].select_dtypes(include=['number']).columns
+    missing_count = demand[numeric_df_cols].isnull().sum().sum()
+    
+    for col in numeric_df_cols:
         if demand[col].isnull().any():
             demand[col].fillna(demand[col].median(), inplace=True)
     
