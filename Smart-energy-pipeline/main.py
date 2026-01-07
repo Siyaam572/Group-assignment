@@ -60,8 +60,9 @@ def main():
     
     # Step 5: Evaluate model
     print("\n[5/6] Evaluating model...")
-    results = evaluate_model(model, X, y, groups, config)
-    logging.info(f"Cross-validation RMSE: {results['cv_rmse']:.4f}")
+    results = evaluate_model(model, X, y, groups, config, df_full=data["merged_df"])
+    logging.info(f"CV Selection-RMSE: {results['cv_selection_rmse_mean']:.4f}")
+
     
     # Step 6: Hyperparameter tuning (optional)
     if config['tuning']['enabled']:
@@ -76,7 +77,10 @@ def main():
     print("PIPELINE COMPLETED SUCCESSFULLY")
     print("="*60)
     print(f"\nModel: {config['model']['type']}")
-    print(f"Final RMSE: {results['cv_rmse']:.4f}")
+    print(f"Final CV Selection-RMSE: {results['cv_selection_rmse_mean']:.4f}")
+    print(f"CV Selection-RMSE (std): {results['cv_selection_rmse_std']:.4f}")
+    print(f"LOGO folds: {results['cv_folds']}")
+    print(f"Held-out test Selection-RMSE: {results['test_selection_rmse']:.4f}")
     print(f"\nOutputs saved to:")
     print(f"  - Models: {config['output']['models_dir']}")
     print(f"  - Results: {config['output']['results_dir']}")
@@ -84,4 +88,5 @@ def main():
     print("\n" + "="*60)
 
 if __name__ == "__main__":
+
     main()
