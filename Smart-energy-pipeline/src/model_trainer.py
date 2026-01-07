@@ -5,7 +5,7 @@
 import pandas as pd
 from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
 
-def train_model(X, y, groups, config):
+def train_model(X, y, groups, plant_ids, config):
     """
     Train the selected model from config.yaml.
 
