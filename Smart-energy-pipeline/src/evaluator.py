@@ -1,6 +1,6 @@
 """
 Model evaluation using Leave-One-Group-Out cross-validation
-selection RMSE metric (Equations 1 & 2)
+Uses selection RMSE metric from assessment brief (Equations 1 & 2)
 """
 import logging
 import numpy as np
@@ -62,7 +62,7 @@ def calculate_selection_rmse(y_true, y_pred, demand_ids):
     }
 
 
-def evaluate_model(model, X, y, groups, plant_ids, config):
+def evaluate_model(model, X, y, groups, config, df_full=None, plant_ids=None):
     """
     Evaluate model using Leave-One-Group-Out cross-validation.
     Fast approach: trains once, reuses for all folds.
@@ -72,8 +72,9 @@ def evaluate_model(model, X, y, groups, plant_ids, config):
         X: Feature matrix
         y: Target values (costs)
         groups: Demand IDs for grouping
-        plant_ids: Plant IDs (not used but kept for consistency)
         config: Configuration dictionary
+        df_full: Full dataframe (optional, not used)
+        plant_ids: Plant IDs (optional, not used)
     
     Returns:
         Dictionary with evaluation metrics
