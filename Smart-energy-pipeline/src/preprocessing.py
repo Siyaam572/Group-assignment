@@ -97,4 +97,4 @@ def preprocess_data(data, config):
     print(f"Features: {X.shape[0]} rows x {X.shape[1]} columns")
     print(f"Unique demands: {len(groups.unique())}, Unique plants: {len(plant_ids.unique())}")
     
-    return X, y, groups, plant_ids
+   return X, y, groups, plant_ids, merged
