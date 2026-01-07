@@ -1,4 +1,5 @@
 """
+Model training module using Role 3's pipeline architecture
 Pipeline: StandardScaler -> VarianceThreshold -> Regressor
 """
 import logging
@@ -10,9 +11,9 @@ from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
 logger = logging.getLogger(__name__)
 
 
-def train_model(X, y, plant_ids, config):
+def train_model(X, y, groups, plant_ids, config):
     """
-    
+    Train model using Role 3's pipeline architecture.
     
     Pipeline steps:
     1. StandardScaler - standardize features
@@ -22,13 +23,14 @@ def train_model(X, y, plant_ids, config):
     Args:
         X: Feature matrix
         y: Target values (costs)
+        groups: Demand IDs for grouping (not used in training but kept for consistency)
         plant_ids: Plant IDs (not used but kept for consistency)
         config: Configuration dictionary
     
     Returns:
         pipeline: Trained sklearn Pipeline object
     """
-    logger.info("Training model...")
+    logger.info("Training model with Role 3's pipeline architecture...")
     
     model_type = config['model']['type']
     
@@ -47,6 +49,7 @@ def train_model(X, y, plant_ids, config):
     else:
         raise ValueError(f"Unknown model type: {model_type}")
     
+    # Create pipeline (Role 3's architecture)
     pipeline = Pipeline(steps=[
         ("scaler", StandardScaler()),
         ("variance", VarianceThreshold(threshold=0.01)),
