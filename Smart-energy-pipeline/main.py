@@ -50,7 +50,7 @@ def main():
     
     # Clean and prepare the data
     print("\n[3/6] Preprocessing data...")
-    X, y, groups, plant_ids = preprocess_data(data, config)
+    X, y, groups, plant_ids, df_full = preprocess_data(data, config)
     logging.info(f"Features prepared: {X.shape[1]} features, {len(groups.unique())} demand scenarios")
     
     # Train the model
@@ -60,7 +60,7 @@ def main():
     
     # Evaluate using LOGO CV
     print("\n[5/6] Evaluating model...")
-    results = evaluate_model(model, X, y, groups, plant_ids, config)
+    results = evaluate_model(model, X, y, groups, config, df_full=df_full, plant_ids=plant_ids)
     logging.info(f"Cross-validation RMSE: {results['cv_rmse']:.4f}")
     
     # Run hyperparameter tuning if enabled
@@ -74,7 +74,7 @@ def main():
     # Print summary
     print("\nPIPELINE COMPLETED SUCCESSFULLY\n")
     print(f"Model: {config['model']['type']}")
-    print(f"Final RMSE: {results['cv_rmse']:.4f}")
+    print(f"Final RMSE: {results['cv_selection_rmse_mean']:.4f}")
     print(f"\nOutputs saved to:")
     print(f"  - Models: {config['output']['models_dir']}")
     print(f"  - Results: {config['output']['results_dir']}")
@@ -83,3 +83,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
