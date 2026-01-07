@@ -1,5 +1,5 @@
 """
-Model training module using Role 3's pipeline architecture
+Model training module using pipeline architecture
 Pipeline: StandardScaler -> VarianceThreshold -> Regressor
 """
 import logging
@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 def train_model(X, y, groups, plant_ids, config):
     """
-    Train model using Role 3's pipeline architecture.
+    Train model using sklearn Pipeline architecture.
     
     Pipeline steps:
     1. StandardScaler - standardize features
@@ -28,9 +28,10 @@ def train_model(X, y, groups, plant_ids, config):
         config: Configuration dictionary
     
     Returns:
-        pipeline: Trained sklearn Pipeline object
+        model: Trained sklearn Pipeline object
+        pipeline: Same as model (for compatibility)
     """
-    logger.info("Training model with Role 3's pipeline architecture...")
+    logger.info("Training model with pipeline architecture...")
     
     model_type = config['model']['type']
     
@@ -49,7 +50,7 @@ def train_model(X, y, groups, plant_ids, config):
     else:
         raise ValueError(f"Unknown model type: {model_type}")
     
-    # Create pipeline (Role 3's architecture)
+    # Create pipeline
     pipeline = Pipeline(steps=[
         ("scaler", StandardScaler()),
         ("variance", VarianceThreshold(threshold=0.01)),
@@ -62,4 +63,4 @@ def train_model(X, y, groups, plant_ids, config):
     
     logger.info(f"Model training complete: {model_type}")
     
-    return pipeline
+    return pipeline, pipeline
