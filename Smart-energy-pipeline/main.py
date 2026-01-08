@@ -1,88 +1,83 @@
 """
-Data preprocessing module
+Smart Energy Grid Pipeline
+Run this file to execute the complete ML pipeline
+Usage: python main.py
 """
-import pandas as pd
-import numpy as np
+import yaml
+import logging
+from pathlib import Path
+
+# Import our custom modules
+from src.data_loader import load_data
+from src.preprocessing import preprocess_data
+from src.model_trainer import train_model
+from src.evaluator import evaluate_model
+from src.tuner import tune_hyperparameters
 
 
-def preprocess_data(data, config):
-    """
-    Preprocess data for model training.
+def load_config(config_path="config/config.yaml"):
+    """Load settings from config file"""
+    with open(config_path, 'r') as f:
+        config = yaml.safe_load(f)
+    return config
+
+
+def setup_logging(level="INFO"):
+    """Configure logging"""
+    logging.basicConfig(
+        level=getattr(logging, level),
+        format='%(asctime)s - %(levelname)s - %(message)s'
+    )
+
+
+def main():
+    """Main function - runs entire pipeline"""
     
-    Args:
-        data: Dictionary with 'demand', 'plants', 'costs', 'merged_df' keys
-        config: Configuration dictionary
+    print("\nSMART ENERGY GRID OPTIMIZATION PIPELINE\n")
     
-    Returns:
-        X: Feature matrix (pandas DataFrame)
-        y: Target values (pandas Series)
-        groups: Demand IDs (pandas Series)
-        plant_ids: Plant IDs (pandas Series)
-        df_full: Full merged DataFrame
-    """
-    print("\nStarting data preprocessing...")
+    # Load configuration
+    print("[1/6] Loading configuration...")
+    config = load_config()
+    setup_logging(config['logging']['level'])
+    logging.info("Configuration loaded successfully")
     
-    # Extract dataframes - data_loader already provides these
-    demand = data['demand'].copy()
-    plants = data['plants'].copy()
-    costs = data['costs'].copy()
+    # Load the three datasets
+    print("\n[2/6] Loading data...")
+    data = load_data(config)
+    logging.info(f"Data loaded: {data['merged_df'].shape[0]} rows")
     
-    # Handle missing values
-    print("Handling missing values...")
-    demand_missing = 0
-    for col in demand.columns:
-        if demand[col].dtype in ['float64', 'int64'] and demand[col].isnull().any():
-            median_val = demand[col].median()
-            demand[col] = demand[col].fillna(median_val)
-            demand_missing += demand[col].isnull().sum()
-    print(f"Filled {demand_missing} missing values in demand features")
+    # Clean and prepare the data
+    print("\n[3/6] Preprocessing data...")
+    X, y, groups, plant_ids, df_full = preprocess_data(data, config)
+    logging.info(f"Features prepared: {X.shape[1]} features, {groups.nunique()} demand scenarios")
     
-    cost_missing = costs['Cost_USD_per_MWh'].isnull().sum()
-    median_cost = costs['Cost_USD_per_MWh'].median()
-    costs['Cost_USD_per_MWh'] = costs['Cost_USD_per_MWh'].fillna(median_cost)
-    print(f"Filled {cost_missing} missing values in costs")
+    # Train the model
+    print("\n[4/6] Training model...")
+    model, pipeline = train_model(X, y, groups, plant_ids, config)
+    logging.info(f"Model trained: {config['model']['type']}")
     
-    # Fix data quality issues
-    print("Fixing data quality issues...")
-    demand['DF_region'] = demand['DF_region'].replace('NA', 'NORAM')
-    plants['Region'] = plants['Region'].replace('NA', 'NORAM')
+    # Evaluate using LOGO CV
+    print("\n[5/6] Evaluating model...")
+    results = evaluate_model(model, X, y, groups, config, df_full=df_full, plant_ids=plant_ids)
+    logging.info(f"Cross-validation RMSE: {results['rmse']:.4f}")
     
-    # Filter non-competitive plants
-    print("Filtering non-competitive plants...")
-    top_plants_per_demand = costs.sort_values(['Demand ID', 'Cost_USD_per_MWh']).groupby('Demand ID').head(10)
-    competitive_plants = top_plants_per_demand['Plant ID'].unique()
+    # Run hyperparameter tuning if enabled
+    if config['tuning']['enabled']:
+        print("\n[6/6] Tuning hyperparameters...")
+        best_model, tuning_results = tune_hyperparameters(X, y, groups, plant_ids, config)
+        logging.info(f"Best RMSE after tuning: {tuning_results['sample_rmse']:.4f}")
+    else:
+        print("\n[6/6] Skipping hyperparameter tuning (disabled in config)")
     
-    original_plant_count = plants['Plant ID'].nunique()
-    plants = plants[plants['Plant ID'].isin(competitive_plants)]
-    costs = costs[costs['Plant ID'].isin(competitive_plants)]
-    remaining_plants = plants['Plant ID'].nunique()
-    
-    print(f"Removed {original_plant_count - remaining_plants} plants, {remaining_plants} remaining")
-    
-    # Merge datasets
-    print("Merging datasets...")
-    df = costs.merge(demand, on='Demand ID', how='inner')
-    df = df.merge(plants, on='Plant ID', how='inner')
-    print(f"Merged dataset shape: {df.shape}")
-    
-    # Separate features and target
-    categorical_cols = ['DF_region', 'DF_daytype', 'Plant Type', 'Region']
-    
-    # One-hot encode categorical variables
-    print(f"One-hot encoding {len(categorical_cols)} categorical columns")
-    df_encoded = pd.get_dummies(df, columns=categorical_cols, drop_first=True)
-    
-    # Get final feature columns
-    encoded_feature_cols = [c for c in df_encoded.columns if c.startswith('DF') or c.startswith('PF')]
-    
-    # Extract data - KEEP AS DATAFRAME/SERIES (not numpy arrays!)
-    X = df_encoded[encoded_feature_cols]
-    y = df_encoded['Cost_USD_per_MWh']
-    groups = df_encoded['Demand ID']
-    plant_ids = df_encoded['Plant ID']
-    
-    print("\nPreprocessing complete")
-    print(f"Features: {X.shape[0]} rows x {X.shape[1]} columns")
-    print(f"Unique demands: {groups.nunique()}, Unique plants: {plant_ids.nunique()}")
-    
-    return X, y, groups, plant_ids, df_encoded
+    # Print summary
+    print("\nPIPELINE COMPLETED SUCCESSFULLY\n")
+    print(f"Model: {config['model']['type']}")
+    print(f"Final RMSE: {results['rmse']:.4f}")
+    print(f"\nOutputs saved to:")
+    print(f"  - Models: {config['output']['models_dir']}")
+    print(f"  - Results: {config['output']['results_dir']}")
+    print(f"  - Figures: {config['output']['figures_dir']}")
+
+
+if __name__ == "__main__":
+    main()
