@@ -7,25 +7,25 @@ import numpy as np
 
 def preprocess_data(data, config):
     """
-    Preprocess merged data for model training.
+    Preprocess data for model training.
     
     Args:
-        data: Dictionary with 'demand', 'plants', 'costs' DataFrames
+        data: Dictionary with 'demand', 'plants', 'costs', 'merged_df' keys
         config: Configuration dictionary
     
     Returns:
-        X: Feature matrix (numpy array)
-        y: Target values (numpy array)
-        groups: Demand IDs (numpy array)
-        plant_ids: Plant IDs (numpy array)
+        X: Feature matrix (pandas DataFrame)
+        y: Target values (pandas Series)
+        groups: Demand IDs (pandas Series)
+        plant_ids: Plant IDs (pandas Series)
         df_full: Full merged DataFrame
     """
     print("\nStarting data preprocessing...")
     
-    # Extract dataframes from data dict
-    demand = data['demand'].copy()
-    plants = data['plants'].copy()
-    costs = data['costs'].copy()
+    # Extract dataframes - data_loader already provides these
+    demand = data['demand_df'].copy()
+    plants = data['plants_df'].copy()
+    costs = data['costs_df'].copy()
     
     # Handle missing values
     print("Handling missing values...")
@@ -66,7 +66,6 @@ def preprocess_data(data, config):
     print(f"Merged dataset shape: {df.shape}")
     
     # Separate features and target
-    feature_cols = [c for c in df.columns if c.startswith('DF') or c.startswith('PF')]
     categorical_cols = ['DF_region', 'DF_daytype', 'Plant Type', 'Region']
     
     # One-hot encode categorical variables
@@ -76,14 +75,14 @@ def preprocess_data(data, config):
     # Get final feature columns
     encoded_feature_cols = [c for c in df_encoded.columns if c.startswith('DF') or c.startswith('PF')]
     
-    # Extract data
-    X = df_encoded[encoded_feature_cols].values
-    y = df_encoded['Cost_USD_per_MWh'].values
-    groups = df_encoded['Demand ID'].values
-    plant_ids = df_encoded['Plant ID'].values
+    # Extract data - KEEP AS DATAFRAME/SERIES (not numpy arrays!)
+    X = df_encoded[encoded_feature_cols]
+    y = df_encoded['Cost_USD_per_MWh']
+    groups = df_encoded['Demand ID']
+    plant_ids = df_encoded['Plant ID']
     
     print("\nPreprocessing complete")
     print(f"Features: {X.shape[0]} rows x {X.shape[1]} columns")
-    print(f"Unique demands: {len(np.unique(groups))}, Unique plants: {len(np.unique(plant_ids))}")
+    print(f"Unique demands: {groups.nunique()}, Unique plants: {plant_ids.nunique()}")
     
     return X, y, groups, plant_ids, df_encoded
