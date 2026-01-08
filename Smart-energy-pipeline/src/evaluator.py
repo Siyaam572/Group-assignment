@@ -96,8 +96,8 @@ def evaluate_model(model, X, y, groups, config, df_full=None, plant_ids=None):
     fold_count = 0
     for train_idx, test_idx in logo.split(X, y, groups):
         # Get predictions for this fold
-        # X is a numpy array, so we can use regular indexing
-        y_pred = model.predict(X[test_idx])
+        # X is a pandas DataFrame, so use .iloc for integer indexing
+        y_pred = model.predict(X.iloc[test_idx])
         
         all_y_true.extend(y[test_idx])
         all_y_pred.extend(y_pred)
