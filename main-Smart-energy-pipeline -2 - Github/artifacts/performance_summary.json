@@ -1,0 +1,18 @@
+{
+  "model_type": "gradient_boosting",
+  "timestamp": "2026-01-09 16:12:55",
+  "train_test": {
+    "r2_score": 0.6304027923956821,
+    "mse": 44.84392099142747,
+    "custom_rmse": 6.584580909215104,
+    "mean_error": -4.019050000000001,
+    "num_test_demands": 20,
+    "num_optimal_selections": 6
+  },
+  "logo_cv": {
+    "mean_rmse": 3.421028,
+    "std_rmse": 4.388513494933791,
+    "min_rmse": 0.0,
+    "max_rmse": 30.325000000000003
+  }
+}
